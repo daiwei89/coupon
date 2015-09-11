@@ -1,87 +1,91 @@
 __author__ = 'yilinhe'
 
-num_user_features = 0
+num_user_features = 51
 num_item_features = 135
 num_user = 22873
 num_item = 19413
 user_dict = {}
-coupon_dict = {}
+reverse_user_dict = {}
+item_dict = {}
+test_item_dict = {}
+reverse_item_dict = {}
 item_feature_dict = {}
-def format_train():
-    f = open("sorted_dense_format.txt")
-    fout = open("formatted_train.txt", 'wb')
 
+
+def load_dictionary():
+    item_cnt = num_item_features
+    with open("factor_training_coupon.txt") as f:
+        for row in f.readlines()[1:]:
+            item_info = row.split("\t")
+
+            features = [str(item_cnt) + ":1"]
+            for i in range(len(item_info))[1:]:
+                features_id = i - 1
+                if float(item_info[i]) != 0:
+                    features.append(str(features_id) + ":" + str(item_info[i]))
+            item_dict[item_info[0].replace('"', "")] = features
+            reverse_item_dict[item_cnt] = item_info[0].replace('"', "")
+            item_cnt += 1
+    with open("factor_testing_coupon.txt") as f:
+        for row in f.readlines()[1:]:
+            item_info = row.split("\t")
+            features = [str(item_cnt) + ":1"]
+            for i in range(len(item_info))[1:]:
+                features_id = i - 1
+                if float(item_info[i]) != 0:
+                    features.append(str(features_id) + ":" + str(item_info[i]))
+            test_item_dict[item_info[0].replace('"', "")] = features
+            reverse_item_dict[item_cnt] = item_info[0].replace('"', "")
+            item_cnt += 1
     user_cnt = num_user_features
-    coupon_cnt = num_item_features
-
-    for line in f.readlines():
-        purchase = line.split("\t")
-        # find user and coupon id
-        if purchase[0] not in user_dict:
-            user_dict[purchase[0]] = user_cnt
+    with open("factor_users.txt") as f:
+        for row in f.readlines()[1:]:
+            user_info = row.split("\t")
+            features = [str(user_cnt) + ":1"]
+            for i in range(len(user_info))[1:]:
+                features_id = i - 1
+                if float(user_info[i]) != 0:
+                    features.append(str(features_id) + ":" + str(user_info[i]))
+            user_dict[user_info[0].replace('"', "")] = features
+            reverse_user_dict[user_cnt] = user_info[0].replace('"', "")
             user_cnt += 1
-        if purchase[1] not in coupon_dict:
-            coupon_dict[purchase[1]] = coupon_cnt
-            coupon_cnt += 1
-        user = user_dict[purchase[0]]
-        coupon = coupon_dict[purchase[1]]
-        # generate feature list for svdfeatures
-        features = [purchase[2], 0, 1, 1]
-        # user features
-        features.append(str(user) + ":1")
-        # item features
-        features.append(str(coupon) + ":1")
-        item_f_cnt = 0
-        item_f_start = 3
-        for i in range(len(purchase))[item_f_start:]:
-            features_id = i - item_f_start
-            if float(purchase[i]) != 0:
-                features.append(str(features_id) + ":" + str(purchase[i]))
-                item_f_cnt += 1
-        features[3] = item_f_cnt + 1
-
-        fout.write("\t".join([str(i) for i in features]) + '\n')
-        item_feature_dict[coupon]=[purchase[1]]+features[5:]
 
 
-def format_test():
-    f = open("factor_testing_coupon.txt")
-    fout = open("formatted_test.txt", 'wb')
+def format_training_data():
+    with open("../data/coupon_detail_train.csv") as fin:
+        fout = open("formatted_train.txt", "wb")
+        for row in fin.readlines()[1:]:
+            purchase = row.split(',')
+            user_features = user_dict[purchase[4]]
+            item_features = item_dict[purchase[5].replace('\n', "")]
+            item_count = purchase[0]
+            features = [item_count, 0, len(user_features), len(item_features)] + user_features + item_features
+            features = [str(i) for i in features]
+            fout.write("\t".join(features) + '\n')
+        fout.close()
 
-    user_cnt = num_user + num_user_features
-    coupon_cnt = num_item + num_item_features
 
-    for line in f.readlines()[1:]:
-        purchase = line.split("\t")
-        if purchase[1] not in coupon_dict:
-            coupon_dict[purchase[1]] = coupon_cnt
-            coupon_cnt += 1
-        coupon = coupon_dict[purchase[1]]
-        # generate feature list for svdfeatures
-        item_feature = [str(coupon) + ":1"]
-        item_f_cnt = 0
-        item_f_start = 3
-        for i in range(len(purchase))[item_f_start:]:
-            features_id = i - item_f_start
-            if int(purchase[i]) != 0:
-                item_feature.append(str(features_id) + ":" + str(purchase[i]))
-                item_f_cnt += 1
+def format_testing_data():
+    with open("formatted_test.txt", "wb") as fout:
+        for user_features in user_dict.values():
+            for item_features in test_item_dict.values():
+                features = [0, 0, len(user_features), len(item_features)] + user_features + item_features
+                features = [str(i) for i in features]
+                fout.write("\t".join(features) + '\n')
+        fout.close()
 
-        for i in user_dict.values():
-            featuers = [0, 0, 1, len(item_feature), str(i) + ":1"] + item_feature
-            fout.write("\t".join([str(i) for i in featuers]) + '\n')
 
 def print_dict():
-    f = open("item_features.txt","wb")
-    for key,val in item_feature_dict.items():
-        f.write(str(key)+"\t"+"\t".join(val)+"\n")
+    f = open("item_features.txt", "wb")
+    for key, val in item_feature_dict.items():
+        f.write(str(key) + "\t" + "\t".join(val) + "\n")
     f.close()
-    f = open("user_features.txt","wb")
-    for key,val in user_dict.items():
-        f.write(str(key)+"\t"+str(val)+"\n")
+    f = open("user_features.txt", "wb")
+    for key, val in user_dict.items():
+        f.write(str(key) + "\t" + str(val) + "\n")
     f.close()
 
-format_train()
-print "finished writing training"
-format_test()
-print_dict()
+
+load_dictionary()
+#format_training_data()
+#format_testing_data()
