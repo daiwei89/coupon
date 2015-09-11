@@ -1,6 +1,6 @@
 __author__ = 'yilinhe'
 from feature_dictionary import *
-
+from sets import Set
 
 def format_training_data():
     with open("../data/coupon_detail_train.csv") as fin:
@@ -40,6 +40,49 @@ def format_training_from_visit():
             features = [item_count, 0, len(user_features), len(item_features)] + user_features + item_features
             features = [str(i) for i in features]
             fout.write("\t".join(features) + '\n')
+        fout.close()
+
+
+def format_training_from_visit_purchase():
+    with open("../data/coupon_visit_train.csv") as fin:
+        fout = open("formatted_train.txt", "wb")
+        last_user_hash = 0
+        items_visited = {}
+        item_purchased = Set()
+        total = 0
+        for row in fin.readlines()[1:]:
+            purchase = row.split(',')
+            user_hash = purchase[5]
+            item_hash = purchase[4].replace('\n', "")
+            if item_hash not in item_dict:
+                continue
+            if user_hash != last_user_hash:
+                if total > 0:
+                    user_features = user_dict[last_user_hash]
+
+                    for item_hash,times in items_visited.items():
+                        item_features = item_dict[item_hash]
+                        rating = 1
+                        if item_hash in item_purchased:
+                            rating = 5
+                        elif times > 1:
+                            rating = 3
+                        features = [rating, 0, len(user_features), len(item_features)] + user_features + item_features
+                        features = [str(i) for i in features]
+                        fout.write("\t".join(features) + '\n')
+
+                items_visited = {}
+                item_purchased = Set()
+                total = 0
+                last_user_hash = user_hash
+
+            if item_hash in items_visited:
+                items_visited[item_hash] += 1
+            else:
+                items_visited[item_hash] = 1
+            if int(purchase[0]) == 1:
+                item_purchased.add(item_hash)
+            total += 1
         fout.close()
 
 
@@ -88,6 +131,6 @@ def print_dict():
     f.close()
 
 
-#format_training_data()
+format_training_from_visit_purchase()
 #format_testing_data()
 format_implicit()
